@@ -943,7 +943,7 @@ int64 GetProofOfWorkReward(int nHeight, int64 nFees, uint256 prevHash)
     int64_t nSubsidy;
 
     // Hard fork 1.0.1 - Blocks before 1151 were calculated using an offset height
-    if (nHeight > 1150) {
+    if (nHeight <= 1150) {
         nSubsidy = ((((nHeight-1)-HALFWAY_BLOCK) * ((nHeight-1)-HALFWAY_BLOCK)) * COIN) / 1327109;
     } else {
         nSubsidy = (((nHeight-HALFWAY_BLOCK) * (nHeight-HALFWAY_BLOCK)) * COIN) / 1327109;
