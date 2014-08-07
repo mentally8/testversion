@@ -940,7 +940,14 @@ int64 GetProofOfWorkReward(int nHeight, int64 nFees, uint256 prevHash)
 {
     // PARABOLIC BLOCK REWARD
     // This is a shifted y=x2 curve that has been normalised to give 1500 coins
-    int64_t nSubsidy = (((pindexBest->nHeight-HALFWAY_BLOCK) * (pindexBest->nHeight-HALFWAY_BLOCK)) * COIN) / 1327109;
+    int64_t nSubsidy;
+
+    // Hard fork 1.0.1 - Blocks before 1150 were calculated using an offset height
+    if (nHeight > 1150) {
+        nSubsidy = ((((nHeight-1)-HALFWAY_BLOCK) * ((nHeight-1)-HALFWAY_BLOCK)) * COIN) / 1327109;
+    } else {
+        nSubsidy = (((nHeight-HALFWAY_BLOCK) * (nHeight-HALFWAY_BLOCK)) * COIN) / 1327109;
+    }
 
     if (pindexBest->nHeight > LAST_POW_BLOCK)
     {
