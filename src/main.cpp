@@ -953,11 +953,25 @@ int64 GetProofOfWorkReward(int nHeight, int64 nFees, uint256 prevHash)
     return nSubsidy + nFees;
 }
 
+static const int BI_ANNUAL_HALVING_HEIGHT = (BLOCKS_PER_DAY * 365) / 2;
+
 // miner's coin stake reward based on nBits and coin age spent (coin-days)
 // simple algorithm, not depend on the diff
 int64 GetProofOfStakeReward(int64 nCoinAge, unsigned int nBits, unsigned int nTime, int nHeight)
 {
-    int64_t nSubsidy = nCoinAge * COIN_YEAR_REWARD / 365 / COIN;
+    // bi-annual halving
+    int64_t halvings = nHeight / BI_ANNUAL_HALVING_HEIGHT;
+
+    // ensure overflow doesn't occur
+    if (halvings >= 64)
+    {
+        return 0;
+    }
+
+    int64 nCoinYearReward = COIN_YEAR_REWARD >> halvings;
+
+    // 200% p.a.
+    int64_t nSubsidy = nCoinAge * nCoinYearReward / 365 / COIN;
 
     // if (fDebug && GetBoolArg("-printcreation"))
     //     printf("GetProofOfStakeReward(): create=%s nCoinAge=%"PRId64"\n", FormatMoney(nSubsidy).c_str(), nCoinAge);
