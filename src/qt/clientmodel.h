@@ -29,6 +29,8 @@ public:
 
     QDateTime getLastBlockDate() const;
 
+    //! Get the height of the last proof of work possible
+    int getLastPowBlockNum() const;
     //! Return true if client connected to testnet
     bool isTestNet() const;
     //! Return true if core is doing initial block download

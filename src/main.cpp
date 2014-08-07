@@ -2787,9 +2787,6 @@ bool LoadExternalBlockFile(FILE* fileIn)
 extern map<uint256, CAlert> mapAlerts;
 extern CCriticalSection cs_mapAlerts;
 
-static string strMintMessage = "Info: Minting suspended due to locked wallet.";
-static string strMintWarning;
-
 string GetWarnings(string strFor)
 {
     int nPriority = 0;
@@ -2798,13 +2795,6 @@ string GetWarnings(string strFor)
 
     if (GetBoolArg("-testsafemode"))
         strRPC = "test";
-
-    // ppcoin: wallet lock warning for minting
-    if (strMintWarning != "")
-    {
-        nPriority = 0;
-        strStatusBar = strMintWarning;
-    }
 
     // Misc warnings like out of disk space and clock is wrong
     if (strMiscWarning != "")
@@ -4349,10 +4339,8 @@ void VaultcoinMiner(CWallet *pwallet, bool fProofOfStake)
 
         while (pwallet->IsLocked())
         {
-            strMintWarning = strMintMessage;
             Sleep(1000);
         }
-        strMintWarning = "";
 
         //
         // Create new block
@@ -4373,10 +4361,8 @@ void VaultcoinMiner(CWallet *pwallet, bool fProofOfStake)
             {
                 if (!pblock->SignBlock(*pwalletMain))
                 {
-                    strMintWarning = strMintMessage;
                     continue;
                 }
-                strMintWarning = "";
                 printf("CPUMiner : proof-of-stake block found %s\n", pblock->GetHash().ToString().c_str()); 
                 SetThreadPriority(THREAD_PRIORITY_NORMAL);
                 CheckWork(pblock.get(), *pwalletMain, reservekey);
@@ -4428,7 +4414,6 @@ void VaultcoinMiner(CWallet *pwallet, bool fProofOfStake)
                     {
                         break;
                     }
-                    strMintWarning = "";
 
                     SetThreadPriority(THREAD_PRIORITY_NORMAL);
                     CheckWork(pblock.get(), *pwalletMain, reservekey);

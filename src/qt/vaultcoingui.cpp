@@ -25,6 +25,7 @@
 #include "notificator.h"
 #include "guiutil.h"
 #include "rpcconsole.h"
+#include "main.h"
 
 #ifdef Q_OS_MAC
 #include "macdockiconhandler.h"
@@ -57,11 +58,16 @@
 
 #include <iostream>
 
+extern bool fWalletUnlockMintOnly;
+
 VaultcoinGUI::VaultcoinGUI(QWidget *parent):
     QMainWindow(parent),
     clientModel(0),
     walletModel(0),
     encryptWalletAction(0),
+    lockWalletAction(0),
+    unlockWalletAction(0),
+    unlockWalletMiningAction(0),
     changePassphraseAction(0),
     aboutQtAction(0),
     trayIcon(0),
@@ -123,16 +129,19 @@ VaultcoinGUI::VaultcoinGUI(QWidget *parent):
     // Status bar notification icons
     QFrame *frameBlocks = new QFrame();
     frameBlocks->setContentsMargins(0,0,0,0);
-    frameBlocks->setMinimumWidth(56);
-    frameBlocks->setMaximumWidth(56);
+    frameBlocks->setMinimumWidth(72);
+    frameBlocks->setMaximumWidth(72);
     QHBoxLayout *frameBlocksLayout = new QHBoxLayout(frameBlocks);
     frameBlocksLayout->setContentsMargins(3,0,3,0);
     frameBlocksLayout->setSpacing(3);
     labelEncryptionIcon = new QLabel();
+    labelMiningIcon = new QLabel();
     labelConnectionsIcon = new QLabel();
     labelBlocksIcon = new QLabel();
     frameBlocksLayout->addStretch();
     frameBlocksLayout->addWidget(labelEncryptionIcon);
+    frameBlocksLayout->addStretch();
+    frameBlocksLayout->addWidget(labelMiningIcon);
     frameBlocksLayout->addStretch();
     frameBlocksLayout->addWidget(labelConnectionsIcon);
     frameBlocksLayout->addStretch();
@@ -258,6 +267,18 @@ void VaultcoinGUI::createActions()
     signMessageAction = new QAction(QIcon(":/icons/edit"), tr("Sign &message..."), this);
     verifyMessageAction = new QAction(QIcon(":/icons/transaction_0"), tr("&Verify message..."), this);
 
+    lockWalletAction = new QAction(QIcon(":/icons/lock_closed"), tr("&Lock wallet"), this);
+    lockWalletAction->setToolTip(tr("Lock wallet"));
+    lockWalletAction->setCheckable(true);
+
+    unlockWalletAction = new QAction(QIcon(":/icons/lock_open"), tr("Unlo&ck wallet"), this);
+    unlockWalletAction->setToolTip(tr("Unlock wallet"));
+    unlockWalletAction->setCheckable(true);
+
+    unlockWalletMiningAction = new QAction(QIcon(":/icons/mining_active"), tr("Unlo&ck wallet for mining"), this);
+    unlockWalletMiningAction->setToolTip(tr("Unlock wallet for mining"));
+    unlockWalletMiningAction->setCheckable(true);
+
     exportAction = new QAction(QIcon(":/icons/export"), tr("&Export..."), this);
     exportAction->setToolTip(tr("Export the data in the current tab to a file"));
     openRPCConsoleAction = new QAction(QIcon(":/icons/debugwindow"), tr("&Debug window"), this);
@@ -269,6 +290,9 @@ void VaultcoinGUI::createActions()
     connect(optionsAction, SIGNAL(triggered()), this, SLOT(optionsClicked()));
     connect(toggleHideAction, SIGNAL(triggered()), this, SLOT(toggleHidden()));
     connect(encryptWalletAction, SIGNAL(triggered(bool)), this, SLOT(encryptWallet(bool)));
+    connect(lockWalletAction, SIGNAL(triggered(bool)), this, SLOT(lockWallet()));
+    connect(unlockWalletAction, SIGNAL(triggered(bool)), this, SLOT(unlockWallet()));
+    connect(unlockWalletMiningAction, SIGNAL(triggered(bool)), this, SLOT(unlockWalletMining(bool)));
     connect(backupWalletAction, SIGNAL(triggered()), this, SLOT(backupWallet()));
     connect(changePassphraseAction, SIGNAL(triggered()), this, SLOT(changePassphrase()));
     connect(signMessageAction, SIGNAL(triggered()), this, SLOT(gotoSignMessageTab()));
@@ -295,8 +319,12 @@ void VaultcoinGUI::createMenuBar()
     file->addAction(quitAction);
 
     QMenu *settings = appMenuBar->addMenu(tr("&Settings"));
-    settings->addAction(encryptWalletAction);
-    settings->addAction(changePassphraseAction);
+    QMenu *securityMenu = settings->addMenu(QIcon(":/icons/key"), tr("&Wallet security"));
+    securityMenu->addAction(encryptWalletAction);
+    securityMenu->addAction(changePassphraseAction);
+    securityMenu->addAction(unlockWalletAction);
+    securityMenu->addAction(unlockWalletMiningAction);
+    securityMenu->addAction(lockWalletAction);
     settings->addSeparator();
     settings->addAction(optionsAction);
 
@@ -356,6 +384,7 @@ void VaultcoinGUI::setClientModel(ClientModel *clientModel)
 
         setNumBlocks(clientModel->getNumBlocks(), clientModel->getNumBlocksOfPeers());
         connect(clientModel, SIGNAL(numBlocksChanged(int,int)), this, SLOT(setNumBlocks(int,int)));
+        connect(clientModel, SIGNAL(numBlocksChanged(int,int)), this, SLOT(updateMining()));
 
         // Report errors from network/worker thread
         connect(clientModel, SIGNAL(error(QString,QString,bool)), this, SLOT(error(QString,QString,bool)));
@@ -385,6 +414,7 @@ void VaultcoinGUI::setWalletModel(WalletModel *walletModel)
 
         setEncryptionStatus(walletModel->getEncryptionStatus());
         connect(walletModel, SIGNAL(encryptionStatusChanged(int)), this, SLOT(setEncryptionStatus(int)));
+        connect(walletModel, SIGNAL(encryptionStatusChanged(int)), this, SLOT(updateMining()));
 
         // Balloon pop-up for new transaction
         connect(walletModel->getTransactionTableModel(), SIGNAL(rowsInserted(QModelIndex,int,int)),
@@ -580,6 +610,38 @@ void VaultcoinGUI::setNumBlocks(int count, int nTotalBlocks)
     progressBarLabel->setToolTip(tooltip);
     progressBar->setToolTip(tooltip);
 }
+
+void VaultcoinGUI::updateMining()
+{
+   if(!walletModel)
+      return;
+
+    labelMiningIcon->setPixmap(QIcon(":/icons/mining_inactive").pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
+
+    if (!clientModel->getNumConnections()) {
+        labelMiningIcon->setToolTip(tr("Wallet is offline"));
+        return;
+    }
+
+    if (walletModel->getEncryptionStatus() == WalletModel::Locked) {
+        labelMiningIcon->setToolTip(tr("Wallet is locked"));
+        return;
+    }
+
+    if (clientModel->inInitialBlockDownload() || clientModel->getNumBlocksOfPeers() > clientModel->getNumBlocks()) {
+        labelMiningIcon->setToolTip(tr("Blockchain download is in progress"));
+        return;
+    }
+
+    if (clientModel->getNumBlocks() <= LAST_POW_BLOCK) {
+        labelMiningIcon->setToolTip(tr("Proof of stake has not started yet"));
+        return;
+    }
+
+    labelMiningIcon->setPixmap(QIcon(":/icons/mining_active").pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
+    labelMiningIcon->setToolTip(tr("Stake miner enabled"));
+}
+
 
 void VaultcoinGUI::error(const QString &title, const QString &message, bool modal)
 {
@@ -789,6 +851,9 @@ void VaultcoinGUI::setEncryptionStatus(int status)
         labelEncryptionIcon->hide();
         encryptWalletAction->setChecked(false);
         changePassphraseAction->setEnabled(false);
+        lockWalletAction->setEnabled(false);
+        unlockWalletAction->setEnabled(false);
+        unlockWalletMiningAction->setEnabled(false);
         encryptWalletAction->setEnabled(true);
         break;
     case WalletModel::Unlocked:
@@ -798,6 +863,17 @@ void VaultcoinGUI::setEncryptionStatus(int status)
         encryptWalletAction->setChecked(true);
         changePassphraseAction->setEnabled(true);
         encryptWalletAction->setEnabled(false); // TODO: decrypt currently not supported
+
+        lockWalletAction->setEnabled(true);
+        lockWalletAction->setChecked(false);
+        unlockWalletAction->setEnabled(false);
+        unlockWalletMiningAction->setEnabled(false);
+
+        if (fWalletUnlockMintOnly)
+            unlockWalletMiningAction->setChecked(true);
+        else
+            unlockWalletAction->setChecked(true);
+
         break;
     case WalletModel::Locked:
         labelEncryptionIcon->show();
@@ -806,6 +882,15 @@ void VaultcoinGUI::setEncryptionStatus(int status)
         encryptWalletAction->setChecked(true);
         changePassphraseAction->setEnabled(true);
         encryptWalletAction->setEnabled(false); // TODO: decrypt currently not supported
+
+        lockWalletAction->setChecked(true);
+        unlockWalletAction->setChecked(false);
+        unlockWalletMiningAction->setChecked(false);
+
+        lockWalletAction->setEnabled(false);
+        unlockWalletAction->setEnabled(true);
+        unlockWalletMiningAction->setEnabled(true);
+
         break;
     }
 }
@@ -822,6 +907,20 @@ void VaultcoinGUI::encryptWallet(bool status)
     setEncryptionStatus(walletModel->getEncryptionStatus());
 }
 
+void VaultcoinGUI::unlockWalletMining(bool status)
+{
+    if(!walletModel)
+        return;
+
+    // Unlock wallet when requested by wallet model
+    if(walletModel->getEncryptionStatus() == WalletModel::Locked)
+    {
+        AskPassphraseDialog dlg(AskPassphraseDialog::UnlockMining, this);
+        dlg.setModel(walletModel);
+        dlg.exec();
+    }
+}
+
 void VaultcoinGUI::backupWallet()
 {
     QString saveDir = QDesktopServices::storageLocation(QDesktopServices::DocumentsLocation);
@@ -831,6 +930,14 @@ void VaultcoinGUI::backupWallet()
             QMessageBox::warning(this, tr("Backup Failed"), tr("There was an error trying to save the wallet data to the new location."));
         }
     }
+}
+
+void VaultcoinGUI::lockWallet()
+{
+    if(!walletModel)
+        return;
+
+    walletModel->setWalletLocked(true);
 }
 
 void VaultcoinGUI::changePassphrase()

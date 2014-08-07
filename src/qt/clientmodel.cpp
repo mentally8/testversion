@@ -120,6 +120,10 @@ double ClientModel::GetDifficulty() const
     return dDiff;
 }
 
+int ClientModel::getLastPowBlockNum() const
+{
+    return LAST_POW_BLOCK;
+}
 
 bool ClientModel::isTestNet() const
 {

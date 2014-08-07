@@ -69,6 +69,7 @@ private:
     QLabel *labelEncryptionIcon;
     QLabel *labelConnectionsIcon;
     QLabel *labelBlocksIcon;
+    QLabel *labelMiningIcon;
     QLabel *progressBarLabel;
     QProgressBar *progressBar;
 
@@ -86,6 +87,9 @@ private:
     QAction *toggleHideAction;
     QAction *exportAction;
     QAction *encryptWalletAction;
+    QAction *lockWalletAction;
+    QAction *unlockWalletAction;
+    QAction *unlockWalletMiningAction;
     QAction *backupWalletAction;
     QAction *changePassphraseAction;
     QAction *aboutQtAction;
@@ -112,6 +116,8 @@ public slots:
     void setNumConnections(int count);
     /** Set number of blocks shown in the UI */
     void setNumBlocks(int count, int nTotalBlocks);
+    /** Set stake miner status in the UI */
+    void updateMining();
     /** Set the encryption status as shown in the UI.
        @param[in] status            current encryption status
        @see WalletModel::EncryptionStatus
@@ -168,7 +174,9 @@ private slots:
     /** Change encrypted wallet passphrase */
     void changePassphrase();
     /** Ask for passphrase to unlock wallet temporarily */
+    void lockWallet();
     void unlockWallet();
+    void unlockWalletMining(bool status);
 
     /** Show window if hidden, unminimize when minimized, rise when obscured or show if hidden and fToggleHidden is true */
     void showNormalIfMinimized(bool fToggleHidden = false);
