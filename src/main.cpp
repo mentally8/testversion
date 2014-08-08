@@ -949,7 +949,7 @@ int64 GetProofOfWorkReward(int nHeight, int64 nFees, uint256 prevHash)
         nSubsidy = (((nHeight-HALFWAY_BLOCK) * (nHeight-HALFWAY_BLOCK)) * COIN) / 1327109;
     }
 
-    if (pindexBest->nHeight > LAST_POW_BLOCK)
+    if (nHeight > LAST_POW_BLOCK)
     {
         nSubsidy = 0;
     }
