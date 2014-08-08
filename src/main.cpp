@@ -1045,6 +1045,12 @@ unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfS
     if (pindexLast == NULL)
         return nProofOfWorkLimit;
 
+    if (fProofOfStake) {
+        const CBlockIndex* pindexPrev = GetLastBlockIndex(pindexLast, true);
+        if (pindexPrev->pprev == NULL)
+            return bnTargetLimit.GetCompact(); // first PoS block, reset diff
+    }
+
     // Only change once per interval
     if ((pindexLast->nHeight+1) % retargetInterval != 0)
     {
