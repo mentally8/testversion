@@ -6,8 +6,11 @@
 
 #include "main.h"
 
+static const unsigned int MODIFIER_SWITCH_BLOCK = 2350;
+
 // MODIFIER_INTERVAL: time to elapse before new modifier is computed
-static const unsigned int MODIFIER_INTERVAL = 6 * 60 * 60;
+static const unsigned int MODIFIER_INTERVAL_OLD = 6 * 60 * 60;
+static const unsigned int MODIFIER_INTERVAL_POST_2350 = 15 * 60;
 extern unsigned int nModifierInterval;
 
 // MODIFIER_INTERVAL_RATIO:
