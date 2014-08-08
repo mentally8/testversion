@@ -633,7 +633,7 @@ void VaultcoinGUI::updateMining()
         return;
     }
 
-    if (clientModel->getNumBlocks() <= LAST_POW_BLOCK) {
+    if (clientModel->getNumBlocks() < LAST_POW_BLOCK) {
         labelMiningIcon->setToolTip(tr("Proof of stake has not started yet"));
         return;
     }
