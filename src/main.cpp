@@ -1925,7 +1925,7 @@ bool CTransaction::GetCoinAge(CTxDB& txdb, uint64& nCoinAge) const
             printf("coin age nValueIn=%"PRI64d" nTimeDiff=%d bnCentSecond=%s\n", nValueIn, nTime - txPrev.nTime, bnCentSecond.ToString().c_str());
     }
 
-    CBigNum bnCoinDay = (bnCentSecond * CENT * 200000) / COIN / (24 * 60 * 60);
+    CBigNum bnCoinDay = (bnCentSecond * CENT * 2000) / COIN / (24 * 60 * 60);
     if (fDebug && GetBoolArg("-printcoinage"))
         printf("coin age bnCoinDay=%s\n", bnCoinDay.ToString().c_str());
     nCoinAge = bnCoinDay.getuint64();
