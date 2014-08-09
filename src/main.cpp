@@ -466,7 +466,7 @@ bool CTransaction::CheckTransaction() const
             return DoS(100, error("CTransaction::CheckTransaction() : txout empty for user transaction"));
 
         // ppcoin: enforce minimum output amount
-        if (!txout.IsEmpty() && !IsCoinBase() && txout.nValue < MIN_TXOUT_AMOUNT)
+        if (!txout.IsEmpty() && !IsCoinBase() && !IsCoinStake() && txout.nValue < MIN_TXOUT_AMOUNT)
             return DoS(100, error("CTransaction::CheckTransaction() : txout.nValue below minimum"));
 
         if (txout.nValue > MAX_MONEY)
@@ -966,6 +966,9 @@ static const int BI_ANNUAL_HALVING_HEIGHT = (BLOCKS_PER_DAY * 365) / 2;
 // simple algorithm, not depend on the diff
 int64 GetProofOfStakeReward(int64 nCoinAge, unsigned int nBits, unsigned int nTime, int nHeight)
 {
+    // Return 0 due to decimal places issue until rectified
+    return 0;
+
     // bi-annual halving
     int64_t halvings = nHeight / BI_ANNUAL_HALVING_HEIGHT;
 
@@ -1925,7 +1928,7 @@ bool CTransaction::GetCoinAge(CTxDB& txdb, uint64& nCoinAge) const
             printf("coin age nValueIn=%"PRI64d" nTimeDiff=%d bnCentSecond=%s\n", nValueIn, nTime - txPrev.nTime, bnCentSecond.ToString().c_str());
     }
 
-    CBigNum bnCoinDay = (bnCentSecond * CENT * 2000) / COIN / (24 * 60 * 60);
+    CBigNum bnCoinDay = (bnCentSecond * CENT) / COIN / (24 * 60 * 60);
     if (fDebug && GetBoolArg("-printcoinage"))
         printf("coin age bnCoinDay=%s\n", bnCoinDay.ToString().c_str());
     nCoinAge = bnCoinDay.getuint64();
