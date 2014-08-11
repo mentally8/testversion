@@ -2225,7 +2225,7 @@ static bool AttemptCheckProofOfStakeWithHeight(const CBlock* pblock, uint256& ha
 
     if (!CheckProofOfStake(pblock->vtx[1], pblock->nBits, hashProofOfStake, nHeight))
     {
-        printf("WARNING: ProcessBlock(): check proof-of-stake failed for block %s\n", hashProofOfStake.ToString().c_str());
+        printf("WARNING: ProcessBlock(): check proof-of-stake failed for block %s\n", pblock->GetHash().ToString().c_str());
         return false;
     }
 
