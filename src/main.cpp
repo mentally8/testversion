@@ -40,7 +40,7 @@ static CBigNum bnProofOfStakeLimit(~uint256(0) >> 20);
 static CBigNum bnProofOfWorkLimitTestNet(~uint256(0) >> 20);
 static CBigNum bnProofOfStakeLimitTestNet(~uint256(0) >> 20);
 
-unsigned int nStakeMinAge = 60 * 60 * 24 * 2;	// minimum age for coin age: 1 hour
+unsigned int nStakeMinAge = STAKE_MIN_AGE_OLD;	// minimum age for coin age: 2 days
 unsigned int nStakeMaxAge = 60 * 60 * 24 * 100;	// stake age of full weight: 100d
 unsigned int nStakeTargetSpacing = 90;			// 90 sec block spacing
 
@@ -1027,6 +1027,17 @@ unsigned int ComputeMinStake(unsigned int nBase, int64 nTime, unsigned int nBloc
     return ComputeMaxBits(bnProofOfStakeLimit, nBase, nTime);
 }
 
+unsigned int GetStakeMinAge(int nHeight)
+{
+    // No hard fork on testnet
+    if (fTestNet)
+        return nStakeMinAge;
+
+    if (nHeight > STAKE_MIN_AGE_SWITCH_BLOCK)
+        return STAKE_MIN_AGE_POST_3350;
+    else
+        return STAKE_MIN_AGE_OLD;
+}
 
 // ppcoin: find last block index up to pindex
 const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfStake)
@@ -1413,7 +1424,7 @@ bool CTransaction::ConnectInputs(CTxDB& txdb, MapPrevTx inputs,
         {
             // ppcoin: coin stake tx earns reward instead of paying fee
             uint64 nCoinAge;
-            if (!GetCoinAge(txdb, nCoinAge))
+            if (!GetCoinAge(txdb, nCoinAge, pindexBlock))
                 return error("ConnectInputs() : %s unable to get coin age for coinstake", GetHash().ToString().substr(0,10).c_str());
             int64 nStakeReward = GetValueOut() - nValueIn;
             if (nStakeReward > GetProofOfStakeReward(nCoinAge, pindexBlock->nBits, nTime, pindexBlock->nHeight) - GetMinFee() + MIN_TX_FEE)
@@ -1896,7 +1907,7 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
 // guaranteed to be in main chain by sync-checkpoint. This rule is
 // introduced to help nodes establish a consistent view of the coin
 // age (trust score) of competing branches.
-bool CTransaction::GetCoinAge(CTxDB& txdb, uint64& nCoinAge) const
+bool CTransaction::GetCoinAge(CTxDB& txdb, uint64& nCoinAge, const CBlockIndex* pindex) const
 {
     CBigNum bnCentSecond = 0;  // coin age in the unit of cent-seconds
     nCoinAge = 0;
@@ -1918,7 +1929,7 @@ bool CTransaction::GetCoinAge(CTxDB& txdb, uint64& nCoinAge) const
         CBlock block;
         if (!block.ReadFromDisk(txindex.pos.nFile, txindex.pos.nBlockPos, false))
             return false; // unable to read block of previous transaction
-        if (block.GetBlockTime() + nStakeMinAge > nTime)
+        if (block.GetBlockTime() + GetStakeMinAge(pindex->nHeight+1) > nTime)
             continue; // only count coins meeting min age requirement
 
         int64 nValueIn = txPrev.vout[txin.prevout.n].nValue;
@@ -1932,28 +1943,6 @@ bool CTransaction::GetCoinAge(CTxDB& txdb, uint64& nCoinAge) const
     if (fDebug && GetBoolArg("-printcoinage"))
         printf("coin age bnCoinDay=%s\n", bnCoinDay.ToString().c_str());
     nCoinAge = bnCoinDay.getuint64();
-    return true;
-}
-
-// ppcoin: total coin age spent in block, in the unit of coin-days.
-bool CBlock::GetCoinAge(uint64& nCoinAge) const
-{
-    nCoinAge = 0;
-
-    CTxDB txdb("r");
-    BOOST_FOREACH(const CTransaction& tx, vtx)
-    {
-        uint64 nTxCoinAge;
-        if (tx.GetCoinAge(txdb, nTxCoinAge))
-            nCoinAge += nTxCoinAge;
-        else
-            return false;
-    }
-
-    if (nCoinAge == 0) // block coin age minimum 1 coin-day
-        nCoinAge = 1;
-    if (fDebug && GetBoolArg("-printcoinage"))
-        printf("block coin age total nCoinDays=%"PRI64d"\n", nCoinAge);
     return true;
 }
 
@@ -2226,6 +2215,22 @@ bool CBlockIndex::IsSuperMajority(int minVersion, const CBlockIndex* pstart, uns
     return (nFound >= nRequired);
 }
 
+static bool AttemptCheckProofOfStakeWithHeight(const CBlock* pblock, uint256& hashProofOfStake)
+{
+    int nHeight;
+    if (mapBlockIndex.count(pblock->hashPrevBlock))
+        nHeight = mapBlockIndex[pblock->hashPrevBlock]->nHeight + 1;
+    else
+        nHeight = -1;
+
+    if (!CheckProofOfStake(pblock->vtx[1], pblock->nBits, hashProofOfStake, nHeight))
+    {
+        printf("WARNING: ProcessBlock(): check proof-of-stake failed for block %s\n", hashProofOfStake.ToString().c_str());
+        return false;
+    }
+
+    return true;
+}
 
 bool ProcessBlock(CNode* pfrom, CBlock* pblock)
 {
@@ -2250,11 +2255,9 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
     if (pblock->IsProofOfStake())
     {
         uint256 hashProofOfStake = 0;
-        if (!CheckProofOfStake(pblock->vtx[1], pblock->nBits, hashProofOfStake))
-        {
-            printf("WARNING: ProcessBlock(): check proof-of-stake failed for block %s\n", hash.ToString().c_str());
+        if (!AttemptCheckProofOfStakeWithHeight(pblock, hashProofOfStake))
             return false; // do not error here as we expect this during initial block download
-        }
+
         if (!mapProofOfStake.count(hash)) // add to mapProofOfStake
             mapProofOfStake.insert(make_pair(hash, hashProofOfStake));
     }
@@ -2330,7 +2333,17 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
              ++mi)
         {
             CBlock* pblockOrphan = (*mi).second;
-            if (pblockOrphan->AcceptBlock())
+            bool proofOk = true;
+            if (pblockOrphan->IsProofOfStake())
+            {
+                uint256 hashProofOfStake;
+                if (!AttemptCheckProofOfStakeWithHeight(pblockOrphan, hashProofOfStake))
+                {
+                    printf("WARNING: ProcessBlock(): check proof-of-stake failed for orphan block %s\n", hashProofOfStake.ToString().c_str());
+                    proofOk = false;
+                }
+            }
+            if (proofOk && pblockOrphan->AcceptBlock())
                 vWorkQueue.push_back(pblockOrphan->GetHash());
             mapOrphanBlocks.erase(pblockOrphan->GetHash());
             setStakeSeenOrphan.erase(pblockOrphan->GetProofOfStake());
@@ -3258,7 +3271,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                 printf("  getblocks stopping at %d %s\n", pindex->nHeight, pindex->GetBlockHash().ToString().substr(0,20).c_str());
                 // ppcoin: tell downloading node about the latest block if it's
                 // without risk being rejected due to stake connection check
-                if (hashStop != hashBestChain && pindex->GetBlockTime() + nStakeMinAge > pindexBest->GetBlockTime())
+                if (hashStop != hashBestChain && pindex->GetBlockTime() + GetStakeMinAge(pindexBest->nHeight) > pindexBest->GetBlockTime())
                     pfrom->PushInventory(CInv(MSG_BLOCK, hashBestChain));
                 break;
             }
