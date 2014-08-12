@@ -40,7 +40,7 @@ static const int64 MAX_MONEY = 1500 * COIN;;
 static const int64 COIN_YEAR_REWARD = 2 * COIN;	// 200% annual interest
 static const int64 MIN_TXOUT_AMOUNT = MIN_TX_FEE;
 
-static const int STAKE_MIN_AGE_SWITCH_BLOCK = 3450;
+static const int STAKE_MIN_AGE_SWITCH_BLOCK = 999999;
 static const unsigned int STAKE_MIN_AGE_OLD          = 60 * 60 * 24 * 2; // 2 days
 static const unsigned int STAKE_MIN_AGE_POST_3450    = 60 * 60 * 9;      // 9 hours
 
