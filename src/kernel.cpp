@@ -297,7 +297,7 @@ bool CheckStakeKernelHash(unsigned int nBits, const CBlock& blockFrom, unsigned 
 {
     // Before the previous block is indexed we don't know the height of this block so must assume we're past the switchover.
     // However, later we will know the height and re-call this function with it so as to check using the correct min age.
-    const unsigned int localStakeMinAge = (nHeight != -1) ? GetStakeMinAge(nHeight) : STAKE_MIN_AGE_POST_3350;
+    const unsigned int localStakeMinAge = (nHeight != -1) ? GetStakeMinAge(nHeight) : STAKE_MIN_AGE_POST_3450;
 
     if (nTimeTx < txPrev.nTime)  // Transaction timestamp violation
         return error("CheckStakeKernelHash() : nTime violation");

@@ -1034,7 +1034,7 @@ unsigned int GetStakeMinAge(int nHeight)
         return nStakeMinAge;
 
     if (nHeight > STAKE_MIN_AGE_SWITCH_BLOCK)
-        return STAKE_MIN_AGE_POST_3350;
+        return STAKE_MIN_AGE_POST_3450;
     else
         return STAKE_MIN_AGE_OLD;
 }

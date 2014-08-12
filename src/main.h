@@ -40,9 +40,9 @@ static const int64 MAX_MONEY = 1500 * COIN;;
 static const int64 COIN_YEAR_REWARD = 2 * COIN;	// 200% annual interest
 static const int64 MIN_TXOUT_AMOUNT = MIN_TX_FEE;
 
-static const int STAKE_MIN_AGE_SWITCH_BLOCK = 3350;
+static const int STAKE_MIN_AGE_SWITCH_BLOCK = 3450;
 static const unsigned int STAKE_MIN_AGE_OLD          = 60 * 60 * 24 * 2; // 2 days
-static const unsigned int STAKE_MIN_AGE_POST_3350    = 60 * 60 * 9;      // 9 hours
+static const unsigned int STAKE_MIN_AGE_POST_3450    = 60 * 60 * 9;      // 9 hours
 
 inline bool MoneyRange(int64 nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 // Threshold for nLockTime: below this value it is interpreted as block number, otherwise as UNIX timestamp.
