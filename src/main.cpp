@@ -966,6 +966,7 @@ static const int BI_ANNUAL_HALVING_HEIGHT = (BLOCKS_PER_DAY * 365) / 2;
 // simple algorithm, not depend on the diff
 int64 GetProofOfStakeReward(int64 nCoinAge, unsigned int nBits, unsigned int nTime, int nHeight)
 {
+	return 50;
     // bi-annual halving
     int64_t halvings = nHeight / BI_ANNUAL_HALVING_HEIGHT;
 
